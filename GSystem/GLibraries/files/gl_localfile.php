@@ -47,7 +47,7 @@
       return $this->uploadMultiple($target_dir,$extensionsArr,300,$filekey);
     }
 
-    private  function uploadMultiple($storagePath,$allowExtensions= [],$maxSize=200,$filekey)
+    private  function uploadMultiple($storagePath,$allowExtensions= [],$maxSize=200,$filekey= 'file')
     {
       if(!isset($_FILES[$filekey])) return ['status'=>false,'message'=>'File not found or invalid key passed'];
       $file = $_FILES[$filekey];
