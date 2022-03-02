@@ -1,4 +1,5 @@
 <?php 
+  var_dump($_SERVER);
   die('BASE_PATH'.BASE_PATH."++++++++++++++++++++++++++++++++++");
   require_once BASE_PATH.'/GSystem/GCore/gc_loader.php';
   require_once BASE_PATH.'/GSystem/GCore/gc_handler.php';
