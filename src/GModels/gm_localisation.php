@@ -62,30 +62,50 @@
 
     private function getallCountries()
     {
+<<<<<<< HEAD
       return $this->db->query('country',['country.id AS countryid','country.name','country.code AS countrycode','telcode','currency.name AS currency','entitycode','iso AS currencyiso','rate AS currencyrate','weight.name AS weightunit','currency.code AS currencycode'])->join('left',[['table'=>'currency','field'=>'id'],['table'=>'country','field'=>'id']])->join('left',[['table'=>'weight','field'=>'id'],['table'=>'country','field'=>'weight_id']]);;
+=======
+      return $this->db->query('country',['country.name','country.code AS countrycode','telcode','currency.name AS currency','entitycode','iso AS currencyiso','rate AS currencyrate','weight.name AS weightunit','currency.code AS currencycode'])->join('right',[['table'=>'currency','field'=>'id'],['table'=>'country','field'=>'id']])->join('right',[['table'=>'weight','field'=>'id'],['table'=>'country','field'=>'weight_id']]);;
+>>>>>>> 04d8d4d03d76d8db3ce8c21572ab70c0a9ed0d2b
     }
 
     private function getregions()
     {
+<<<<<<< HEAD
       return $this->db->query('city',['city.id AS cityid','country_id AS countryid','city.name AS cityname','country.name AS countryname', 'currency.name AS currency','currency.rate AS currencyrate', 'iso AS currencyiso','telcode', 'weight.name AS weightunit'])->join('inner',[['table'=>'country','field'=>'id'],['table'=>'city','field'=>'country_id']])->join('left',[['table'=>'currency','field'=>'id'],['table'=>'country','field'=>'id']])->join('left',[['table'=>'weight','field'=>'id'],['table'=>'country','field'=>'weight_id']]);
     }
     public function getCountries($status = 1)
     {
       return $this->getallCountries()->where_equal('country.status',$status)->exec()->rows;
+=======
+      return $this->db->query('city',['id','country_id AS countryid','city.name AS cityname','state','country.name AS countryname', 'currency.name AS currency','currency.rate AS currencyrate', 'currencyiso','telcode', 'weight.name AS weightunit'])->join('inner',[['table'=>'country','field'=>'id'],['table'=>'city','field'=>'country_id']])->join('right',[['table'=>'currency','field'=>'id'],['table'=>'country','field'=>'country_id']])->join('right',[['table'=>'weight','field'=>'id'],['table'=>'country','field'=>'weight_id']]);
+    }
+    public function getCountries($status = 1)
+    {
+      return $this->getallCountries()->where_equal('country.status',$status)->execute();
+>>>>>>> 04d8d4d03d76d8db3ce8c21572ab70c0a9ed0d2b
     }
 
     public function getCountryRegions($countryId,$status = 1)
     {
+<<<<<<< HEAD
       return $this->getregions()->where_equal('city.status',$status)->and_where('country_id',$countryId,'city')->exec()->rows;
     }
     public function getCountryStates($countryId,$status = 1)
     {
       return $this->db->query('city',['DISTINCT city.state'])->where_equal('city.status',$status)->and_where('country_id',$countryId,'city')->exec()->rows;
+=======
+      return $this->getregions()->where_equal('city.status',$status)->and_where('country_id',$countryId,'city')->execute();
+>>>>>>> 04d8d4d03d76d8db3ce8c21572ab70c0a9ed0d2b
     }
 
     public function getRegion($regionId,$status = 1)
     {
+<<<<<<< HEAD
       return $this->getregions()->where_equal('city.status',$status)->and_where('city.id',$regionId)->exec()->row;
+=======
+      return $this->getregions()->where_equal('city.status',$status)->and_where('city.id',$regionId)->execute(1);
+>>>>>>> 04d8d4d03d76d8db3ce8c21572ab70c0a9ed0d2b
     }
   }
 ?>

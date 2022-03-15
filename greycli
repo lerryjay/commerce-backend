@@ -6,6 +6,7 @@ if (php_sapi_name() !== 'cli') {
 require __DIR__ . '/GSystem/GCore/cli/autoloader.php';
 require __DIR__ . '/GSystem/GCore/cli/gc_controller.php';
 require __DIR__ . '/GSystem/GCore/cli/gc_create.php';
+require __DIR__ . '/GSystem/GCore/cli/gc_test.php';
 require __DIR__ . '/GSystem/GCore/cli/gc_composer.php';
 
 
@@ -13,6 +14,8 @@ require __DIR__ . '/GSystem/GCore/cli/gc_composer.php';
 $app = new GCCliMain();
 
 $app->registerController('create', new GCCliCreateController($app));
+
+$app->registerController('test', new GCCliTestController($app));
 
 $app->registerCommand('help', function (array $argv) use ($app) {
     $app->getPrinter()->display("usage: greycli create [ type ] [ filename ] \n\nType can either be \n\n \t--controller \n \t--model \n \t--route ");
