@@ -1,152 +1,264 @@
-<?php 
-  class GMUser Extends GModel{
-    private $mtablename = 'users';
+<?php
+class GMUser extends GModel
+{
+    private $mainusertbl = 'users';
+
+    /**
+     * Undocumented function long description
+     *
+     * @param Type $var Description
+     * @return type
+     * @throws conditon
+     **/
+    public function addUser(
+        $email,
+        $telephone,
+        $username,
+        $password,
+        $firstname,
+        $lastname,
+        $othername,
+        $role = 'user'
+    ) {
+        $id = uniqid();
+        $insertUser = $this->db->insert('users', [
+            'id' => $id,
+            'firstname' => $firstname,
+            'lastname' => $lastname,
+            'othername' => $othername,
+            'email' => $email,
+            'telephone' => $telephone,
+            'username' => $username,
+        ]);
+        $insertAuth = $this->db->insert('auth', [
+            'user_id' => $id,
+            'password' => $password,
+            'role' => $role,
+        ]);
+        return $insertAuth ? $id : null;
+    }
+
+    public function update($userId, $data)
+    {
+        return $this->db->update($this->mainusertbl, $data, ['id' => $userId]);
+    }
+
+    /**
+     * undocumented function summary
+     *
+     * Undocumented function long description
+     *
+     * @param Type $var Description
+     * @return type
+     * @throws conditon
+     **/
     private function getusers()
     {
-      return $this->db->query( $this->mtablename, ['username','telephone','email','trade_id  AS tradeid, id AS userid']);
+        return $this->db
+            ->query($this->mainusertbl, [
+                'id AS userid',
+                'password',
+                'username',
+                'telephone',
+                'email',
+                'firstname',
+                'lastname',
+                'othername',
+                'users.status',
+                'role',
+                'activation',
+                'permissions',
+                'tokenexpdate',
+                'tokenexptime',
+                'token',
+                'city_id AS regionid',
+                'country_id AS countryid',
+                '(SELECT name FROM city WHERE id = city_id) AS city',
+                '(SELECT name FROM country WHERE id = country_id) AS country',
+            ])
+            ->join('inner', [
+                ['table' => 'auth', 'field' => 'user_id'],
+                ['table' => 'users', 'field' => 'id'],
+            ]);
     }
 
-    private function getlogin()
+    public function getUserById($userId, $status = 1)
     {
-      $this->db->query('login',array("login.*,username,email,telephone,trade_id, users.id AS userid"));
-      $this->db->join('inner',
-        [
-          [
-            "table"=>"users",
-            "field"=>"id"
-          ],
-          [
-            "table"=>"login",
-            "field"=>"user_id"
-          ]
-        ]
-      );   
-      return;
+        return $this->getusers()
+            ->where_equal('users.status', $status)
+            ->and_where('id', $userId)
+            ->exec()->row;
     }
 
-
-  	public function addUser($email,$telephone,$username,$tradeId)
-  	{
-      return $this->db->insert($this->mtablename,
-        array(
-          'username'=>$username,
-          'email'=>$email,
-          'telephone'=>$telephone,
-          'trade_id'=>$tradeId
-        )
-      );
-  	}
-
-    public function addLogin($userId,$password,$role = 1)
+    public function getUserByLoginId($loginId, $status = 1)
     {
-      return $this->db->insert('login',
-        array(
-          'user_id' => $userId,
-          'password'=> $password,
-          'role'=>$role
-        )
-      );
+        return $this->getusers()
+            ->where_equal('users.status', $status)
+            ->and_where('email', $loginId, 'users')
+            ->or_where('username', $loginId, 'users')
+            ->or_where('telephone', $loginId, 'users')
+            ->exec()->row;
     }
-    public function getUserByLoginId($loginId)
+
+    public function getUserByHField($token, $status = 1)
     {
-      $this->getlogin();
-      $this->db->where_equal("email",$loginId,'','users');
-      $this->db->or_where("username",$loginId,'users');
-      $this->db->or_where("telephone",$loginId,'users');
-      return $this->db->exec()->row;
+        return $this->getusers()
+            ->where_equal('users.status', $status)
+            ->and_where('hfield', $token, 'auth')
+            ->exec()->row;
     }
 
-    public function getLoginByUsernameOrEmail($loginId)
+    public function updateAuthToken(
+        $userId,
+        $token,
+        $tokenexpdate,
+        $tokenexptime,
+        $stringtoken = 'OPEN'
+    ) {
+        return $this->db->update(
+            'auth',
+            [
+                'token' => $token,
+                'tokenexpdate' => $tokenexpdate,
+                'tokenexptime' => $tokenexptime,
+                'hfield' => $stringtoken,
+            ],
+            ['user_id' => $userId]
+        );
+    }
+
+    public function updatePassword($userId, $password)
     {
-      $this->getlogin();
-      $this->db->where_equal("email",$loginId,'','users');
-      $this->db->or_where("username",$loginId,'users');
-      return $this->db->exec()->row;
+        return $this->db->update(
+            'auth',
+            ['password' => $password, 'token' => rand(100000, 999999)],
+            ['user_id' => $userId]
+        );
     }
 
-    public function getLoginByUsernameOrTel($loginId)
+    public function updateStatus($userId, $status = 0)
     {
-      $this->getlogin();
-      $this->db->where_equal("telephone",$loginId,'','users');
-      $this->db->or_where("username",$loginId,'users');
-      return $this->db->exec()->row;
+        return $this->update($userId, ['status' => 0]);
+    }
+    public function updateProfile(
+        $userId,
+        $telephone,
+        $username,
+        $firstname,
+        $lastname,
+        $othername,
+        $countryid,
+        $regionid
+    ) {
+        return $this->update($userId, [
+            'telephone' => $telephone,
+            'username' => $username,
+            'firstname' => $firstname,
+            'lastname' => $lastname,
+            'othername' => $othername,
+            'country_id' => $countryid,
+            'city_id' => $regionid,
+        ]);
     }
 
-    public function getLoginbyUserId($userId,$status = 1)
+    public function updateActivation($userId, $activation)
     {
-      $this->getlogin();
-      $this->db->where_equal("user_id",$userId,'','login');
-      $this->db->and_where('status',$status);
-      return $this->db->exec()->row;
+        return $this->db->update(
+            'auth',
+            ['activation' => $activation],
+            ['user_id' => $userId]
+        );
     }
 
-    public function getLoginbyTradeId($tradeId,$status = 1)
+    public function addFilter($filter = [])
     {
-      $this->getlogin();
-      $this->db->where_equal("trade_id",$tradeId,'','users');
-      $this->db->and_where('status',$status);
-      return $this->db->exec()->row;
+        if (isset($filter['customerid']) && strlen($filter['customerid']) > 0) {
+            $this->db->and_where(
+                'id',
+                $filter['customerid'],
+                $this->mainusertbl
+            );
+        }
+        if (isset($filter['activation']) && strlen($filter['activation']) > 0) {
+            $this->db->and_where('activation', $filter['activation'], 'auth');
+        }
+        if (isset($filter['search']) && strlen($filter['search']) > 0) {
+            $this->db->add_condition(
+                'AND ( firstname LIKE % ? % OR lastname LIKE % ? % OR othernames LIKE % ? % or username LIKE % ? % OR email LIKE % ? %',
+                [
+                    $filter['search'],
+                    $filter['search'],
+                    $filter['search'],
+                    $filter['search'],
+                    $filter['search'],
+                ]
+            );
+        }
+        if (isset($filter['on']) && strlen($filter['on']) > 0) {
+            $this->db->and_where(
+                'createdat',
+                $filter['on'],
+                $this->mainusertbl
+            );
+        }
+        if (isset($filter['role']) && strlen($filter['role']) > 0) {
+            $this->db->and_where('role', $filter['role'], 'auth');
+        }
+
+        if (isset($filter['startdate']) && strlen($filter['startdate']) > 0) {
+            $this->db->and_where_less_equal(
+                'createdat',
+                $filter['startdate'],
+                $this->mainusertbl
+            );
+        }
+        if (isset($filter['enddate']) && strlen($filter['enddate']) > 0) {
+            $this->db->and_where_greater_equal(
+                'createdat',
+                $filter['enddate'],
+                $this->mainusertbl
+            );
+        }
+
+        if (isset($filter['limit'])) {
+            $limit = $filter['limit'];
+            $this->db->limit($filter['limit']);
+        } else {
+            $limit = 20;
+            $this->db->limit(20);
+        }
+
+        if (isset($filter['pageno']) && strlen($filter['pageno'] > 0)) {
+            $this->db->offset(($filter['pageno'] - 1) * $limit);
+        } else {
+            $this->db->offset(0);
+        }
+
+        if (isset($filter['sort'])) {
+            $sort = $filter['sort'];
+        } else {
+            $sort = 'createdat';
+        }
+
+        if (!isset($filter['order']) && strlen($filter['order'] > 0)) {
+            $order = $filter['order'];
+        } else {
+            $order = 'DESC';
+        }
+
+        if ($order == 'DESC') {
+            $this->db->order_by_desc($this->mainusertbl, $sort);
+        } else {
+            $this->db->order_by_asc($this->mainusertbl, $sort);
+        }
+
+        return $this->db;
     }
 
-    public function updatePassword($userId,$newPassword)
+    public function getCustomers($filter = [], $status = 1)
     {
-      return $this->db->update('login',
-        [
-          'password'=>$this->encrypt->password($newPassword)
-        ],
-        [
-          'user_id'=>$userId
-        ]
-      );
+        $filter['role'] = 'user';
+        $this->getusers()->where_equal('users.status', $status);
+        return $this->addFilter($filter)->exec()->rows;
     }
-
-    public function updateToken($userId,$token,$tokenexpdate)
-    {
-      return $this->db->update('login',
-        [
-          'token'=>$token,
-          'token_expiry_date'=>$tokenexpdate
-
-        ],
-        [
-          'user_id'=>$userId
-        ]
-      );
-    }
-
-    public function getUserbyEmail($email,$status = 1)
-    {
-      $this->getusers();
-      $this->db->where_equal('email',$email);
-      $this->db->and_where('status',$status);
-      return $this->db->execute();
-    }
-
-    public function getUserbyTelephone($telephone,$status = 1)
-    {
-      $this->getusers();
-      $this->db->where_equal('telephone',$telephone);
-      $this->db->and_where('status',$status);
-      // $this->db->echoSql();
-      return $this->db->execute();
-    }
-
-    public function getUserbyUsername($username,$status = 1)
-    {
-      $this->getusers();
-      $this->db->where_equal('username',$username);
-      $this->db->and_where('status',$status);
-      return $this->db->execute();
-    }
-
-    public function getUserbyTradeId($tradeId,$status = 1)
-    {
-      $this->getusers();
-      $this->db->where_equal('trade_id',$tradeId);
-      $this->db->and_where('status',$status);
-      return $this->db->exec()->row;
-    }
-
-
-  }
-?>
+} ?> 
