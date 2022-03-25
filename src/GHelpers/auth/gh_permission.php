@@ -1,7 +1,7 @@
 <?php
 class GHAuthPermission extends GHelpers
 {
-    public function userHasPermission()
+    public function userHasPermission($permission)
     {
         $this->load->model('user');
         $user = $this->model_user->getUserById($this->userId);
@@ -24,7 +24,7 @@ class GHAuthPermission extends GHelpers
         }
     }
 
-    public function adminHasPermission()
+    public function adminHasPermission($permission)
     {
         $requestData = $this->http->validate_jwt_token();
         if (!$requestData['isadmin']) {
@@ -102,11 +102,48 @@ class GHAuthPermission extends GHelpers
             $this->request->emit([
                 'error' => true,
                 'message' =>
-                    'Store not found! Please create a store or contact admin',
+                'Store not found! Please create a store or contact admin',
                 'code' => 404,
             ]);
         }
         return $seller;
     }
+
+    public function isSellerProduct()
+    {
+        $user = $this->isUser();
+        $this->load->model('seller');
+
+        $seller = $this->model_seller->getUserSellerProfile($user['userid']);
+        if (!$seller) {
+            $this->request->emit([
+                'error' => true,
+                'message' =>
+                'Store not found! Please create a store or contact admin',
+                'code' => 404,
+            ]);
+        }
+
+        $productId = $this->request->get('productid');
+        $this->load->model('product');
+        $product = $this->model_product->getProductsById($productId);
+        if (!$product) {
+            $this->request->emit([
+                'error' => true,
+                'message' =>
+                'Product not found!',
+                'code' => 404,
+            ]);
+        }
+
+        if ($product['storeid'] !== $seller['msellerid']) {
+            $this->request->emit([
+                'error' => true,
+                'message' =>
+                'Forbidden!',
+                'code' => 403,
+            ]);
+        }
+        return ['seller' => $seller, 'product' => $product];
+    }
 }
-?>

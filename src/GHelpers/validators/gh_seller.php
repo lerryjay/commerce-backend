@@ -3,7 +3,7 @@ class GHValidatorsSeller extends GHelpers
 {
     public function register($params)
     {
-        extract($this->request->post(['storename', 'storeid'], true));
+        extract($this->request->JSONPost(['storename', 'storeid'], true));
         if (!isset($storeid) || strlen($storeid) < 3) {
             $this->request->emit([
                 'status' => false,
@@ -39,4 +39,3 @@ class GHValidatorsSeller extends GHelpers
         ];
     }
 }
-?>

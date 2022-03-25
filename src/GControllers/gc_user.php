@@ -10,7 +10,7 @@ class GCUser extends GController
 
     public function add()
     {
-        $user = $this->load->helper('auth/user', 'adminHasPermission', [
+        $user = $this->load->helper('user', 'adminHasPermission', [
             'CREATECUSTOMER',
         ]);
         $password = $this->encrypt->generatePassword();
@@ -167,24 +167,25 @@ class GCUser extends GController
         $data = $this->load->helper(
             'validators/user',
             'signup',
-            $this->request->post([
-                'firstname',
-                'lastname',
-                'othername',
-                'password',
-                'email',
-                'telephone',
-            ])
         );
         extract($data);
 
         $this->load->model('user');
+
+        $userExists = $this->model_user->getUserByLoginId($username);
+        if ($userExists) {
+            $this->request->emit([
+                'status' => false,
+                'message' => 'Email is associated with another account',
+                'data' => ['field' => 'username'],
+            ]);
+        }
         $userExists = $this->model_user->getUserByLoginId($email);
         if ($userExists) {
             $this->request->emit([
                 'status' => false,
                 'message' => 'Email is associated with another account',
-                'field' => 'email',
+                'data' => ['field' => 'email'],
             ]);
         }
         $userExists = $this->model_user->getUserByLoginId($telephone);
@@ -192,30 +193,53 @@ class GCUser extends GController
             $this->request->emit([
                 'status' => false,
                 'message' =>
-                    'Telephone number is associated with another account',
-                'field' => 'telephone',
+                'Telephone number is associated with another account',
+                'data' => ['field' => 'telephone'],
             ]);
         }
         $username = $username ?? '';
+        $firstname = $firstname ?? '';
+        $lastname = $lastname ?? '';
+        $othername = $othername ?? '';
+
+        $tradeId = $this->encrypt->gen_rand_alpha_num(15, 'NG');
         $insert = $this->model_user->addUser(
             $email,
             $telephone,
             $username,
             $this->encrypt->password($password),
-            $firstname,
-            $lastname,
-            $othername
+            $tradeId
         );
-        if ($insert) {
-            // send account creation mail
-            $this->request->emit([
-                'status' => true,
-                'message' => 'Registration Successful',
-            ]);
-        }
+
+        $this->load->model('trader');
+        $this->model_trader->addTrader($insert, '', '', '', '', 0, 0, date('Y-m-d'));
+
+        $traderData = $this->model_trader->getTraderByTradeId($tradeId);
+        $token = $this->encrypt->generate_jwt(
+            [
+                'bearer' => $tradeId,
+                'logindate' => date('Y-m-d H:i:s'),
+            ],
+            10000
+        );
+        $refreshtoken = $this->encrypt->generate_jwt(
+            [
+                'nature' => 'refresh',
+                'bearer' => $tradeId,
+                'logindate' => date('Y-m-d H:i:s'),
+            ],
+            30
+        );
+
+        // send account creation mail
         $this->request->emit([
-            'status' => false,
-            'message' => 'Registration failed',
+            'status' => true,
+            'message' => 'Registration Successful',
+            'data' => [
+                'refreshtoken' => $token,
+                'token' => $refreshtoken,
+                'expires' => date('Y-m-d H:i:s', strtotime('10000 minutes')),
+            ],
         ]);
     }
 
@@ -224,40 +248,34 @@ class GCUser extends GController
         $data = $this->load->helper(
             'validators/user',
             'login',
-            $this->request->post(['password', 'loginid'])
+            $this->request->JSONPost(['password', 'loginid'])
         );
         extract($data);
         $this->load->model('user');
         $userExists = $this->model_user->getUserByLoginId($loginId);
 
-	if ($userExists) {
+        if ($userExists) {
             extract($userExists);
-            if (password_verify($this->request->post('password'), $password)) {
+            if (password_verify($data['password'], $password)) {
                 // send login mail
                 $token = $this->encrypt->generate_jwt(
                     [
-                        'bearer' => $userExists['userid'],
+                        'bearer' => $userExists['trade_id'],
                         'logindate' => date('Y-m-d H:i:s'),
                     ],
-                    10
+                    10000
                 );
                 $refreshtoken = $this->encrypt->generate_jwt(
                     [
                         'nature' => 'refresh',
-                        'bearer' => $userExists['userid'],
+                        'bearer' => $userExists['trade_id'],
                         'logindate' => date('Y-m-d H:i:s'),
                     ],
                     30
                 );
                 $userData = [
-                    'email' => $userExists['email'],
-                    'username' => $userExists['username'],
-                    'firstname' => $userExists['firstname'],
-                    'lastname' => $userExists['lastname'],
-                    'othername' => $userExists['othername'],
-                    'telephone' => $userExists['telephone'],
                     'token' => $token,
-                    'expires' => date('Y-m-d H:i:s', strtotime('10 minutes')),
+                    'expires' => date('Y-m-d H:i:s', strtotime('10000 minutes')),
                     'refreshtoken' => $refreshtoken,
                 ];
                 $this->request->emit([
@@ -267,10 +285,13 @@ class GCUser extends GController
                 ]);
             }
         }
-        $this->request->emit([
-            'status' => false,
-            'message' => 'Invalid username or password',
-        ]);
+        $this->request->emit(
+            [
+                'status' => false,
+                'message' => 'Invalid username or password',
+            ],
+            400
+        );
     }
 
     public function forgotpassword()
@@ -282,7 +303,7 @@ class GCUser extends GController
             $this->request->emit([
                 'status' => false,
                 'message' =>
-                    'Account cannot be verified or user does not exist',
+                'Account cannot be verified or user does not exist',
             ]);
         }
         $token = rand(100000, 999999);
@@ -317,7 +338,7 @@ class GCUser extends GController
             $this->request->emit([
                 'status' => false,
                 'message' =>
-                    'Account cannot be verified or user does not exist',
+                'Account cannot be verified or user does not exist',
             ]);
         }
         $token = rand(100000, 999999);
@@ -363,7 +384,7 @@ class GCUser extends GController
                     'bearer' => $userExists['userid'],
                     'token' => $userExists['token'],
                     'exp' =>
-                        $userExists['tokenexpdate'] .
+                    $userExists['tokenexpdate'] .
                         ' ' .
                         $userExists['tokenexptime'],
                 ];
@@ -404,11 +425,11 @@ class GCUser extends GController
             $userExists &&
             $userExists['token'] == $token &&
             strtotime(date('Y-m-d H:i:s')) <=
-                strtotime(
-                    $userExists['tokenexpdate'] .
-                        ' ' .
-                        $userExists['tokenexptime']
-                )
+            strtotime(
+                $userExists['tokenexpdate'] .
+                    ' ' .
+                    $userExists['tokenexptime']
+            )
         ) {
             $password = $this->encrypt->password(
                 $this->request->post('password')
@@ -461,7 +482,7 @@ class GCUser extends GController
         $this->request->emit([
             'status' => false,
             'message' =>
-                'User cannot be verified and request could not be completed',
+            'User cannot be verified and request could not be completed',
             'code' => 401,
         ]);
     }
@@ -496,8 +517,8 @@ class GCUser extends GController
         $this->load->model('address');
         $addresses =
             $user['role'] == 'admin'
-                ? $this->model_address->getAddress($filter)
-                : $this->model_address->getUserAddresses($this->userId);
+            ? $this->model_address->getAddress($filter)
+            : $this->model_address->getUserAddresses($this->userId);
         $addresses = $addresses ?: [];
         $this->request->emit([
             'status' => true,
@@ -729,4 +750,4 @@ class GCUser extends GController
             'data' => $res,
         ]);
     }
-} ?> 
+}

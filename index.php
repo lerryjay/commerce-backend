@@ -7,5 +7,3 @@ define('BASE_PATH', $_SERVER['DOCUMENT_ROOT'] . '/');
 require_once 'GSystem/GConfig/index.php';
 
 require_once 'GSystem/GCore/index.php';
-
-?>

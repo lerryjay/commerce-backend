@@ -72,6 +72,22 @@ class GMSeller extends GModel
         ]);
     }
 
+    public function updateSellerProfile(
+        $msellerId,
+        $name,
+        $slogan
+    ) {
+        return $this->db->update(
+            $this->sellertablename,
+            [
+                'name' => $name,
+                'slogan' => $slogan,
+            ],
+            [
+                'id' => $msellerId,
+            ]
+        );
+    }
     public function updateSeller(
         $msellerId,
         $name,
@@ -265,4 +281,3 @@ class GMSeller extends GModel
         return $this->db->exec()->rows;
     }
 }
-?>

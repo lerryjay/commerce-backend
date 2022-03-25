@@ -3,7 +3,7 @@ class GHValidatorsProduct extends GHelpers
 {
     public function add($params = [])
     {
-        $params = $this->request->post([
+        $params = $this->request->JSONPost([
             'productname',
             'shortdescription',
             'longdescription',
@@ -50,7 +50,7 @@ class GHValidatorsProduct extends GHelpers
                 'field' => 'quantity',
             ]);
         }
-        if (isset($price) && !$this->validator->amount($price)) {
+        if (isset($price) && !$this->validator->double($price)) {
             $this->request->emit([
                 'error' => true,
                 'code' => 400,
@@ -76,4 +76,3 @@ class GHValidatorsProduct extends GHelpers
         return $params;
     }
 }
-?>

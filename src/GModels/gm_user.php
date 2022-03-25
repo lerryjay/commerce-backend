@@ -15,27 +15,21 @@ class GMUser extends GModel
         $telephone,
         $username,
         $password,
-        $firstname,
-        $lastname,
-        $othername,
+        $tradeId,
         $role = 'user'
     ) {
-        $id = uniqid();
         $insertUser = $this->db->insert('users', [
-            'id' => $id,
-            'firstname' => $firstname,
-            'lastname' => $lastname,
-            'othername' => $othername,
+            'trade_id' => $tradeId,
             'email' => $email,
             'telephone' => $telephone,
             'username' => $username,
         ]);
-        $insertAuth = $this->db->insert('auth', [
-            'user_id' => $id,
+        $this->db->insert('auth', [
+            'user_id' => $insertUser,
             'password' => $password,
             'role' => $role,
         ]);
-        return $insertAuth ? $id : null;
+        return $insertUser;
     }
 
     public function update($userId, $data)
@@ -57,6 +51,7 @@ class GMUser extends GModel
         return $this->db
             ->query($this->mainusertbl, [
                 'users.id AS userid',
+                'trade_id',
                 'password',
                 'username',
                 'telephone',
@@ -68,7 +63,7 @@ class GMUser extends GModel
                 'tokenexpdate',
                 'tokenexptime',
                 'token',
-             ])
+            ])
             ->join('inner', [
                 ['table' => 'auth', 'field' => 'user_id'],
                 ['table' => 'users', 'field' => 'id'],
@@ -80,6 +75,13 @@ class GMUser extends GModel
         return $this->getusers()
             ->where_equal('users.status', $status)
             ->and_where('id', $userId)
+            ->exec()->row;
+    }
+    public function getUserbyTradeId($tradeId, $status = 1)
+    {
+        return $this->getusers()
+            ->where_equal('users.status', $status)
+            ->and_where('trade_id', $tradeId)
             ->exec()->row;
     }
 
@@ -254,4 +256,4 @@ class GMUser extends GModel
         $this->getusers()->where_equal('users.status', $status);
         return $this->addFilter($filter)->exec()->rows;
     }
-} ?> 
+}

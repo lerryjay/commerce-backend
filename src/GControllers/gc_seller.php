@@ -6,14 +6,13 @@ class GCSeller extends GController
         $seller = $this->load->helper('auth/permission', 'isSeller');
 
         if ($seller) {
-            $this->load->model('product');
-            $seller['products'] =
-                $this->model_product->getSellerProducts($seller['msellerid']) ?:
-                [];
+            unset($seller['msellerid']);
+            unset($seller['tradeid']);
+            unset($seller['userid']);
             $this->request->emit([
                 'status' => true,
                 'message' =>
-                    'Store data retreived successfully. Happy Trading!',
+                'Store data retreived successfully. Happy Trading!',
                 'data' => $seller,
             ]);
         }
@@ -36,7 +35,7 @@ class GCSeller extends GController
             $this->request->emit([
                 'error' => true,
                 'message' =>
-                    'An error was encountered. Please try again later!',
+                'An error was encountered. Please try again later!',
                 'code' => 503,
             ]);
         }
@@ -45,6 +44,34 @@ class GCSeller extends GController
             'message' => 'Store successfully created. Happy Trading!',
         ]);
     }
+
+    public function update()
+    {
+        $seller = $this->load->helper('auth/permission', 'isSeller');
+        $this->load->model('seller');
+
+        $data = $this->request->JSONPost(['slogan', 'storename', 'storeid'], true);
+
+        $update = $this->model_seller->updateSellerProfile(
+            $seller['msellerid'],
+            $data['storename'],
+            $data['slogan'],
+        );
+
+        if ($update) {
+            $this->request->emit([
+                'status' => true,
+                'message' => 'Store info updated successfully',
+            ]);
+        } else {
+            $this->request->emit([
+                'error' => true,
+                'message' => 'Update Failed',
+                'code' => 500,
+            ]);
+        }
+    }
+
     public function updateSeller()
     {
         $this->load->model('seller');
@@ -83,7 +110,7 @@ class GCSeller extends GController
         $seller = $this->load->helper('auth/permission', 'isSeller');
         $this->load->model('seller');
 
-        $data = $this->request->post(['shortinfo'], true);
+        $data = $this->request->JSONPost(['shortinfo'], true);
 
         $update = $this->model_seller->updateSellerShortInfo(
             $seller['msellerid'],
@@ -284,4 +311,3 @@ class GCSeller extends GController
         return ['status' => true];
     }
 }
-?>

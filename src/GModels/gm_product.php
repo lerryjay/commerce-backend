@@ -23,6 +23,7 @@ class GMProduct extends GModel
             'type' => $type,
         ]); //RECONSIDER PRODUCT HIDDEN<OPEN,DIGITAL,
     }
+
     public function addProductCategory($productId, $categoryId)
     {
         return $this->db->insert('productcategory', [
@@ -30,6 +31,7 @@ class GMProduct extends GModel
             'category_id' => $categoryId,
         ]);
     }
+
     public function addProductRelation($product1Id, $product2Id)
     {
         return $this->db->insert('productrelation', [
@@ -74,7 +76,9 @@ class GMProduct extends GModel
         $promo_price,
         $quantity,
         $shortdescription,
-        $long_description
+        $long_description,
+        $manufacturer_id,
+        $brand_id
     ) {
         return $this->db->update(
             $this->maintbl,
@@ -82,11 +86,13 @@ class GMProduct extends GModel
                 'name' => $name,
                 'sku' => $sku,
                 'promo_price' => $promo_price,
+                'price' => $price,
+                'quantity' => $quantity,
                 'shortdescription' => $shortdescription,
                 'long_description' => $long_description,
-                'manufacturer' => $manufacturer,
+                'manufacturer_id' => $manufacturer_id,
+                'brand_id' => $brand_id,
                 'weight' => $weight,
-                'brand' => $brand,
             ],
             [
                 'product_id' => $productId,
@@ -211,17 +217,19 @@ class GMProduct extends GModel
         return $this->db->query(
             $this->maintbl,
             array_merge($fields, [
-                'products.id',
+                'products.id as productid',
                 'products.name',
                 'products.price',
                 'products.views',
                 'products.likes',
                 'products.weight',
                 'products.sku',
-                'shortdescription',
-                'products.long_description',
+                'products.shortdescription',
+                'products.longdescription',
+                'products.createdat',
+                'products.updatedat',
                 '(
-          SELECT COUNT(*) FROM orders WHERE orders.product_id = products.id 
+          SELECT COUNT(*) FROM orders WHERE orders.product_id = products.id
         )  AS totalorders',
             ])
         );
@@ -333,13 +341,13 @@ class GMProduct extends GModel
     {
         $fields = [
             '(
-        SELECT COUNT(*) FROM orders INNER JOIN delivery ON orders.delivery_id = delivery.id WHERE delivery.delivery_status = ? AND orders.product_id = products.id 
+        SELECT COUNT(*) FROM orders INNER JOIN delivery ON orders.delivery_id = delivery.id WHERE delivery.delivery_status = ? AND orders.product_id = products.id
       ) AS completedorders',
             '(
-        SELECT COUNT(*) FROM orders INNER JOIN delivery ON orders.delivery_id = delivery.id WHERE delivery.delivery_status = ? AND orders.product_id = products.id 
+        SELECT COUNT(*) FROM orders INNER JOIN delivery ON orders.delivery_id = delivery.id WHERE delivery.delivery_status = ? AND orders.product_id = products.id
       ) AS transitorders',
             '(
-        SELECT COUNT(*) FROM orders INNER JOIN delivery ON orders.delivery_id = delivery.id WHERE delivery.delivery_status = ? AND orders.product_id = products.id 
+        SELECT COUNT(*) FROM orders INNER JOIN delivery ON orders.delivery_id = delivery.id WHERE delivery.delivery_status = ? AND orders.product_id = products.id
       ) AS pendingorders',
         ];
         $this->getproducts($fields);
@@ -424,7 +432,17 @@ class GMProduct extends GModel
         $status = 1
     ) {
     }
-
+    public function getStoreProducts($sellerId, $status = 1)
+    {
+        $fields = [
+            ' (SELECT mediaurl FROM productmedia WHERE productmedia.product_id = products.id AND productmedia.mediatype = 1 AND productmedia.TYPE = 1  AND productmedia.status = 1 LIMIT 1 ) AS imageurl',
+            ' (SELECT storeid FROM msellers WHERE products.mseller_id = msellers.id )AS storeid',
+        ];
+        $this->getproducts($fields);
+        $this->db->where_equal('mseller_id', $sellerId);
+        $this->db->and_where('status', $status);
+        return $this->db->exec()->rows;
+    }
     public function getSellerProducts($sellerId, $visibility = 1, $status = 1)
     {
         $fields = [
@@ -800,4 +818,3 @@ class GMProduct extends GModel
         return $this->db->exec()->rows;
     }
 }
-?>

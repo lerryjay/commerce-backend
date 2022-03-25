@@ -1,20 +1,40 @@
 <?php
 class GCProduct extends GController
 {
+    public function index()
+    {
+        // $jwtdata = $this->request->validate_jwt_token();
+        // $this->userId = $jwtdata['bearer'];
+        // Check admin or user
+        $this->getStoreProducts();
+    }
+
     public function add()
     {
         $seller = $this->load->helper('auth/permission', 'isSeller');
-        $data = $this->load->helper('validators/product', 'add');
-
+        $this->load->helper('validators/product', 'add');
+        $data = $this->request->JSONPost([
+            'productname',
+            'shortdescription',
+            'longdescription',
+            'quantity',
+            'price',
+            'visibility',
+            'type',
+        ]);
         $this->load->model('product');
+        $quantity = $data['quantity'] ?? 1;
+        $shortdescription = $data['shortdescription'] ?? '';
+        $type = $data['type'] ?? 'physical';
+        $visibility = $data['visibility'] ?? 1;
         $insert = $this->model_product->addProduct(
             $seller['msellerid'],
             $data['productname'],
             $data['price'],
-            $data['quantity'],
-            $data['shortdescription'],
-            $data['type'],
-            $data['visibility']
+            $quantity,
+            $shortdescription,
+            $type,
+            $visibility
         );
         if (!$insert) {
             $response = [
@@ -31,16 +51,138 @@ class GCProduct extends GController
         }
         $this->request->emit($response);
     }
-    public function updateProductProfile(
-        $sellerTradeId,
-        $productId,
-        $price,
-        $shortdescr,
-        $longDescription,
-        $manufacturerId,
-        $brand,
-        $weight
-    ) {
+
+
+
+    public function update()
+    {
+
+        $this->load->helper('auth/permission', 'isSellerProduct');
+        $data = $this->request->JSONPost([
+            'productname',
+            'shortdescription',
+            'longdescription',
+            'quantity',
+            'price',
+            'visibility',
+            'type',
+        ]);
+
+        $updated = $this->model_product->update($data);
+
+        if ($updated) {
+            $this->request->emit(['status' => true, 'message' => 'Product updated successfully!']);
+        }
+        $this->request->emit(['error' => true, 'message' => 'Error updating product'], 500);
+
+
+        // Validate Product exist
+        // Validate product is updated by seller or admin with permission
+        // Validate update data
+
+        // Check product type to determine to add dimension
+        // Update product
+        // Update main category the main category for the pproduct
+    }
+
+    public function updatedescriptions()
+    {
+        $data = $this->request->JSONPost([
+            'shortdescription',
+            'longdescription',
+        ]);
+
+        // Validate Product exist
+        // Validate product is updated by seller or admin with permission
+        // Validate update data
+
+        // Check product type to determine to add dimension
+        // Update product
+        // Update main category the main category for the pproduct
+    }
+
+    public function updatecategory()
+    {
+        $categories = $this->request->JSONPost(
+            'categories'
+        );
+        $this->load->model('products');
+        $productExist = $this->model_products->getProductsById($productId);
+        if (!$productExist['status']) {
+            return ['error' => true, 'message' => 'Product not found'];
+        }
+        $categoryUpdate = $categories;
+        $opened = $this->model_products->getProductCategory($productId);
+        $opened =
+            isset($opened['status']) && $opened['status']
+            ? $opened['data']
+            : [];
+        foreach ($opened as $category) {
+            if (!in_array($category['category_id'], $categories)) {
+                $this->model_products->updateProductCategoryStatus(
+                    $productId,
+                    $category['category_id'],
+                    0
+                );
+            }
+            in_array($category['category_id'], $categories)
+                ? array_splice(
+                    $categories,
+                    array_search($category['category_id'], $categories),
+                    1
+                )
+                : null;
+        }
+
+        $closed = $this->model_products->getProductCategory($productId, 0);
+        $closed =
+            isset($closed['status']) && $closed['status']
+            ? $closed['data']
+            : [];
+        foreach ($closed as $category) {
+            if (in_array($category['category_id'], $categories)) {
+                $this->model_products->updateProductCategoryStatus(
+                    $productId,
+                    $category['category_id'],
+                    1
+                );
+                array_splice(
+                    $categories,
+                    array_search($category['category_id'], $categories),
+                    1
+                );
+            }
+        }
+        $this->load->model('category');
+        foreach ($categories as $categoryId) {
+            $categoryExist = $this->model_category->getCategoryById(
+                $categoryId
+            );
+            if ($categoryExist['status']) {
+                $this->model_products->addProductCategory(
+                    $productId,
+                    $categoryId
+                );
+                in_array(array_search($categoryId, $categories))
+                    ? array_splice(
+                        $categories,
+                        array_search($categoryId, $categories),
+                        1
+                    )
+                    : null;
+            }
+        }
+        return $categories != $categoryUpdate
+            ? [
+                'status' => true,
+                'message' => 'Categories updated',
+                'data' => ['invalid' => $categories],
+            ]
+            : ['error' => true, 'message' => 'Invalid Categories!'];
+    }
+
+    public function updateimages()
+    {
     }
 
     public function updateSalesRegion($tradeId, $productId, $regions)
@@ -171,119 +313,25 @@ class GCProduct extends GController
         ];
     }
 
-    private function getArrayIndexKey($array, $field, $value)
-    {
-        foreach ($array as $key => $item) {
-            if ($item[$field] == $value) {
-                return $key;
-            }
-        }
-        return -1;
-    }
-
-    public function updateProductCategory($tradeId, $productId, $categories)
+    public function removemedia($tradeId, $productId, $imageId)
     {
         $this->load->model('products');
         $productExist = $this->model_products->getProductsById($productId);
         if (!$productExist['status']) {
             return ['error' => true, 'message' => 'Product not found'];
         }
-        $categoryUpdate = $categories;
-        $opened = $this->model_products->getProductCategory($productId);
-        $opened =
-            isset($opened['status']) && $opened['status']
-                ? $opened['data']
-                : [];
-        foreach ($opened as $category) {
-            if (!in_array($category['category_id'], $categories)) {
-                $this->model_products->updateProductCategoryStatus(
-                    $productId,
-                    $category['category_id'],
-                    0
-                );
-            }
-            in_array($category['category_id'], $categories)
-                ? array_splice(
-                    $categories,
-                    array_search($category['category_id'], $categories),
-                    1
-                )
-                : null;
-        }
-
-        $closed = $this->model_products->getProductCategory($productId, 0);
-        $closed =
-            isset($closed['status']) && $closed['status']
-                ? $closed['data']
-                : [];
-        foreach ($closed as $category) {
-            if (in_array($category['category_id'], $categories)) {
-                $this->model_products->updateProductCategoryStatus(
-                    $productId,
-                    $category['category_id'],
-                    1
-                );
-                array_splice(
-                    $categories,
-                    array_search($category['category_id'], $categories),
-                    1
-                );
-            }
-        }
-        $this->load->model('category');
-        foreach ($categories as $categoryId) {
-            $categoryExist = $this->model_category->getCategoryById(
-                $categoryId
-            );
-            if ($categoryExist['status']) {
-                $this->model_products->addProductCategory(
-                    $productId,
-                    $categoryId
-                );
-                in_array(array_search($categoryId, $categories))
-                    ? array_splice(
-                        $categories,
-                        array_search($categoryId, $categories),
-                        1
-                    )
-                    : null;
-            }
-        }
-        return $categories != $categoryUpdate
-            ? [
-                'status' => true,
-                'message' => 'Categories updated',
-                'data' => ['invalid' => $categories],
-            ]
-            : ['error' => true, 'message' => 'Invalid Categories!'];
-    }
-    public function updateProductMainImage($tradeId, $productId, $imageId)
-    {
-    }
-    public function deleteProduct($tradeId, $productId)
-    {
-        $this->load->model('product');
-        $productExist = $this->model_products->getProductsById($productId);
-        if (!$productExist['status']) {
-            return ['error' => true, 'message' => 'Product not found'];
-        }
-        $deleted = $this->model_products->updateProductStatus($productId, 0);
+        $deleted = $this->model_products->updateProductMediaStatus(
+            $imageId,
+            0
+        );
         if ($deleted['status']) {
             return [
                 'status' => true,
                 'message' => 'Product deleted successfully!',
             ];
         }
-        return ['error' => true, 'message' => 'An error was encountered!'];
     }
-    public function uploadProductImages($tradeId, $productId)
-    {
-        $this->load->model('product');
-        $productExist = $this->model_products->getProductsById($productId);
-        if (!$productExist['status']) {
-            return ['error' => true, 'message' => 'Product not found'];
-        }
-    }
+
     public function updateProductVisibility($tradeId, $productId, $visibility)
     {
         $this->load->model('product');
@@ -306,26 +354,31 @@ class GCProduct extends GController
             'message' => 'An error occured while performing the action!',
         ];
     }
+
     public function updateProductAudience($tradeId, $productId, $audience)
     {
     }
+
     public function updateProductLocation($tradeId, $productId, $regions)
     {
     }
-    public function updateProductViews($productId)
+
+    public function updateviews()
     {
+        $productId = $this->request->get('productid');
         $this->load->model('products');
         $productExist = $this->model_products->getProductsById($productId);
-        if (!$productExist['status']) {
-            return ['error' => true, 'message' => 'Product not found'];
+        if (!$productExist) {
+            $this->request->emit(['error' => true, 'message' => 'Product not found']);
         }
         $updated = $this->model_products->updateProductViews($productId);
-        if ($updated['status']) {
-            return ['status' => true, 'message' => 'Product views updated!'];
+        if ($updated) {
+            $this->request->emit(['status' => true, 'message' => 'Product views updated!']);
         }
-        return ['error' => true, 'message' => 'Error updating views'];
+        $this->request->emit(['error' => true, 'message' => 'Error updating views'], 500);
     }
-    public function updateProductLikes($productId)
+
+    public function updatelikes($productId)
     {
         $this->load->model('products');
         $productExist = $this->model_products->getProductsById($productId);
@@ -338,27 +391,41 @@ class GCProduct extends GController
         }
         return ['error' => true, 'message' => 'Error updating likes'];
     }
-    public function removeProductMedia($tradeId, $productId, $imageId)
+
+
+    private function getArrayIndexKey($array, $field, $value)
     {
-        $this->load->model('products');
+        foreach ($array as $key => $item) {
+            if ($item[$field] == $value) {
+                return $key;
+            }
+        }
+        return -1;
+    }
+
+
+
+    public function deleteProduct($tradeId, $productId)
+    {
+        $this->load->model('product');
         $productExist = $this->model_products->getProductsById($productId);
         if (!$productExist['status']) {
             return ['error' => true, 'message' => 'Product not found'];
         }
-        $deleted = $this->model_products->updateProductMediaStatus(
-            $imageIdc,
-            0
-        );
+        $deleted = $this->model_products->updateProductStatus($productId, 0);
         if ($deleted['status']) {
             return [
                 'status' => true,
                 'message' => 'Product deleted successfully!',
             ];
         }
+        return ['error' => true, 'message' => 'An error was encountered!'];
     }
+
     public function addProductReviews($tradeId, $productId, $review)
     {
     }
+
     public function removeProductReview($tradeId, $productId, $reviewId)
     {
     }
@@ -378,80 +445,49 @@ class GCProduct extends GController
             'data' => $productExist['data'],
         ];
     }
-    public function getProductInfoSeller($productId)
-    {
-        $this->load->model('products');
-        $productExist = $this->model_products->getProductBySeller($productId);
-        if (!$productExist['status']) {
-            return ['error' => true, 'message' => 'Product not found'];
-        }
-        return [
-            'status' => true,
-            'message' => 'Products found',
-            'data' => $productExist['data'],
-        ];
-    }
+
     public function getProductInfoAdmin($productId)
     {
     }
-    public function getStoreProducts($storeid)
+    public function getStoreProducts()
     {
         $this->load->model('seller');
-        $this->load->model('products');
-        $sellerExists = $this->model_seller->getSellerbyStoreId($storeid);
-        if (!$sellerExists['status']) {
-            return [
-                'error' => true,
-                'message' => 'No seller account is associated with tradeId!',
-            ];
-        }
-        $sellerProducts = $this->model_products->getSellerProducts(
-            $sellerExists['data']['msellerid']
+        $this->load->model('product');
+        $seller = $this->load->helper('auth/permission', 'isSeller');
+
+        $sellerProducts = $this->model_product->getStoreProducts(
+            $seller['msellerid']
         );
-        if (!$sellerProducts['status']) {
-            return ['error' => true, 'message' => 'Seller has no products!'];
-        }
         $i = 0;
-        foreach ($sellerProducts['data'] as $item) {
-            $media = $this->model_products->getProductMedia($item['id']);
-            $sellerProducts['data'][$i]['media'] = $media['status']
-                ? $media['data']
-                : [];
+        foreach ($sellerProducts as $item) {
+            $sellerProducts[$i]['media'] = $this->model_product->getProductMedia($item['productid']);
             $i++;
         }
-        return [
+        $response = [
             'status' => true,
-            'message' => 'Seller products found',
-            'data' => $sellerProducts['data'],
+            'message' => 'Store products retrieved successfully',
+            'data' => ['products' => $sellerProducts, 'total' => 5, 'limit' => 10, 'page' => 1],
         ];
+        $this->request->emit($response);
     }
 
-    public function getSellerProducts($productId)
+    // TODO: Add query params to endpoint
+    public function getSellerProducts()
     {
+
         $this->load->model('products');
-        $productExist = $this->model_products->getProductsById($productId);
-        if (!$productExist['status']) {
-            return ['error' => true, 'message' => 'Product not found'];
-        }
         $this->load->model('seller');
-        $sellerProducts = $this->model_products->getSellerProducts(
-            $productExist['data']['msellerid']
-        );
-        if (!$sellerProducts['status']) {
-            return ['error' => true, 'message' => 'Seller has no products!'];
-        }
+
+        $sellerProducts = $this->model_products->getSellerProducts();
         $i = 0;
-        foreach ($sellerProducts['data'] as $item) {
-            $media = $this->model_products->getProductMedia($item['id']);
-            $sellerProducts['data'][$i]['media'] = $media['status']
-                ? $media['data']
-                : [];
+        foreach ($sellerProducts as $item) {
+            $sellerProducts[$i]['media'] =  $this->model_products->getProductMedia($item['id']);
             $i++;
         }
         return [
             'status' => true,
             'message' => 'Seller products found',
-            'data' => $sellerProducts['data'],
+            'data' => $sellerProducts,
         ];
     }
     public function getProductSellerInfo($productId)
@@ -537,4 +573,3 @@ class GCProduct extends GController
     {
     }
 }
-?>
